@@ -128,7 +128,7 @@ const TOOLS = [
 ];
 
 async function callDeepSeek(messages) {
-  const r = await fetch(API_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+  const r = await fetch(API_URL, {method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+API_KEY},body:JSON.stringify({
     model:"deepseek-chat",messages,tools:TOOLS,tool_choice:"auto",temperature:0.1,max_tokens:1024
   })});
   return r.json();
