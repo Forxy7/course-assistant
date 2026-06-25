@@ -173,7 +173,10 @@ function executeTool(name, args) {
 }
 
 async function agent(userMsg) {
-  const msgs = [{role:"system",content:"你是课表助手。回答简洁直接，列出课程时间和地点。如果没课就说没课。"},{role:"user",content:userMsg}];
+const todayStr = new Date().toLocaleDateString("zh-CN",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+const weekNum = getCurrentWeek();
+const sysPrompt = "你是课表助手。今天是"+todayStr+"，第"+weekNum+"周。回答简洁直接，列出课程时间和地点。如果没课就说没课。";
+const msgs = [{role:"system",content:sysPrompt},{role:"user",content:userMsg}];
   for (let i=0; i<5; i++) {
     const result = await callDeepSeek(msgs);
     if (result.error) return "API错误: "+result.error.message;
