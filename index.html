@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>课表助手</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f5f5;height:100vh;display:flex;flex-direction:column}
+.header{background:#4A90D9;color:white;padding:14px 16px;text-align:center;font-size:17px;font-weight:600;flex-shrink:0}
+.header small{font-size:12px;font-weight:400;opacity:0.85}
+.chat{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:10px 14px;border-radius:12px;font-size:15px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word}
+.user{align-self:flex-end;background:#4A90D9;color:white;border-bottom-right-radius:4px}
+.bot{align-self:flex-start;background:white;color:#333;border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+.input-bar{display:flex;padding:10px 12px;background:white;border-top:1px solid #e0e0e0;flex-shrink:0}
+.input-bar input{flex:1;border:1px solid #ddd;border-radius:20px;padding:10px 16px;font-size:15px;outline:none}
+.input-bar input:focus{border-color:#4A90D9}
+.input-bar button{background:#4A90D9;color:white;border:none;border-radius:20px;padding:10px 20px;margin-left:8px;font-size:15px;cursor:pointer;white-space:nowrap}
+.input-bar button:disabled{opacity:0.5}
+.loading{text-align:center;color:#999;font-size:13px;padding:6px}
+.info{text-align:center;color:#bbb;font-size:12px;padding:6px}
+</style>
+</head>
+<body>
+<div class="header">课表助手 <small>2025-2026学年第二学期</small></div>
+<div class="chat" id="chat"></div>
+<div class="loading" id="loading" style="display:none">思考中...</div>
+<div class="input-bar">
+<input id="input" type="text" placeholder="问课表，如：明天有什么课" autocomplete="off">
+<button id="send" onclick="send()">发送</button>
+</div>
+<div class="info">💡 试试问：今天有什么课 / 这周实验 / 星期五的课</div>
+<script>
+// ── 课表数据 ──
+const SCHEDULE = {semester:"2025-2026学年第二学期",weeks_total:18,course_list:[
+{n:"马克思主义基本原理",d:"星期一",s:"08:20",e:"10:00",l:"明志楼301",w:"2,4,6,8,10,12,14,16"},
+{n:"形势与政策（四）",d:"星期一",s:"08:20",e:"10:00",l:"明志楼301",w:"3,5,7,9"},
+{n:"主题班会",d:"星期一",s:"10:15",e:"11:55",l:"闻道楼403",w:"12"},
+{n:"主题班会",d:"星期一",s:"10:15",e:"11:55",l:"闻道楼302",w:"16"},
+{n:"企业办公组网课程设计",d:"星期一",s:"14:00",e:"15:40",l:"洪涛楼503(公共机房6)",w:"1"},
+{n:"通信电子线路",d:"星期一",s:"14:00",e:"15:40",l:"学思楼304",w:"5"},
+{n:"企业办公组网课程设计",d:"星期一",s:"15:55",e:"17:35",l:"洪涛楼503(公共机房6)",w:"1"},
+{n:"现代通信技术",d:"星期二",s:"08:20",e:"10:00",l:"闻道楼301",w:"2-17"},
+{n:"职业素质课II",d:"星期二",s:"10:15",e:"11:55",l:"闻道楼304",w:"2-3"},
+{n:"职业素质课II",d:"星期二",s:"10:15",e:"11:55",l:"闻道楼302",w:"4-6"},
+{n:"职业素质课II",d:"星期二",s:"10:15",e:"11:55",l:"闻道楼302",w:"7-9"},
+{n:"数字电路与逻辑设计实验",d:"星期二",s:"10:15",e:"11:55",l:"大器楼104(电工电子实验室)",w:"10-17"},
+{n:"企业办公组网课程设计",d:"星期二",s:"15:55",e:"17:35",l:"洪涛楼503(公共机房6)",w:"1"},
+{n:"电磁场与电磁波",d:"星期三",s:"08:20",e:"10:00",l:"学思楼303",w:"2-17"},
+{n:"信号与系统",d:"星期三",s:"10:15",e:"11:55",l:"大器楼302(融合通信和RFID综合实验室)",w:"2-13"},
+{n:"信号与系统",d:"星期三",s:"10:15",e:"11:55",l:"大器楼302(融合通信和RFID综合实验室)",w:"14-17"},
+{n:"企业办公组网课程设计",d:"星期三",s:"14:00",e:"15:40",l:"洪涛楼503(公共机房6)",w:"1"},
+{n:"数字电路与逻辑设计",d:"星期三",s:"14:00",e:"15:40",l:"学思楼204",w:"2-17"},
+{n:"企业办公组网课程设计",d:"星期三",s:"15:55",e:"17:35",l:"洪涛楼503(公共机房6)",w:"1"},
+{n:"大学体育Ⅲ",d:"星期三",s:"15:55",e:"17:35",l:"羽毛球场",w:"2-17"},
+{n:"概率论与数理统计",d:"星期四",s:"08:20",e:"10:00",l:"致远楼303",w:"2-8,10-17"},
+{n:"概率论与数理统计",d:"星期四",s:"08:20",e:"10:00",l:"致远楼101",w:"9"},
+{n:"马克思主义基本原理",d:"星期四",s:"10:15",e:"11:55",l:"明志楼301",w:"2-17"},
+{n:"企业办公组网课程设计",d:"星期四",s:"14:00",e:"15:40",l:"洪涛楼503(公共机房6)",w:"1"},
+{n:"通信系统建模与仿真I",d:"星期四",s:"14:00",e:"15:40",l:"大器楼403(移动互联和下一代网络业务开发实验室)",w:"2,4,6,8"},
+{n:"主题班会",d:"星期四",s:"14:00",e:"15:40",l:"温故楼401",w:"3"},
+{n:"通信系统建模与仿真I",d:"星期四",s:"14:00",e:"15:40",l:"大器楼403(移动互联和下一代网络业务开发实验室)",w:"10,12,14,16"},
+{n:"企业办公组网课程设计",d:"星期四",s:"15:55",e:"17:35",l:"洪涛楼503(公共机房6)",w:"1"},
+{n:"通信电子线路",d:"星期五",s:"08:20",e:"10:00",l:"学思楼403",w:"6"},
+{n:"通信电子线路",d:"星期五",s:"10:15",e:"11:55",l:"学思楼304",w:"2-3,5,7-14"},
+{n:"通信电子线路",d:"星期五",s:"10:15",e:"11:55",l:"大器楼202(通信原理和光纤通信实验室)",w:"15-17"},
+{n:"企业办公组网课程设计",d:"星期五",s:"14:00",e:"15:40",l:"洪涛楼503(公共机房6)",w:"1"},
+{n:"主题班会",d:"星期五",s:"14:00",e:"15:40",l:"学思楼304",w:"8"},
+{n:"大学日语IV",d:"星期五",s:"15:55",e:"17:35",l:"致远楼201",w:"2-17"},
+{n:"大学日语IV",d:"星期六",s:"14:00",e:"15:40",l:"在线网络课程",w:"3,5"},
+{n:"大学日语IV",d:"星期六",s:"14:00",e:"15:40",l:"在线网络课程",w:"7,9,11,13,15,17"}
+]};
+
+const DAYS = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
+const WEEKS_TOTAL = 18;
+// 开学日期: 2026-03-02
+const SEMESTER_START = new Date(2026, 2, 2);
+
+function getCurrentWeek() {
+  const now = new Date();
+  const diff = (now - SEMESTER_START) / (1000*60*60*24);
+  return Math.max(1, Math.floor(diff / 7) + 1);
+}
+
+function getDayName(date) {
+  return DAYS[date.getDay()];
+}
+
+function inWeek(weekSpec, weekNum) {
+  for (const part of weekSpec.split(",")) {
+    const p = part.trim();
+    if (p.includes("-")) {
+      const [a, b] = p.split("-").map(Number);
+      if (weekNum >= a && weekNum <= b) return true;
+    } else if (Number(p) === weekNum) return true;
+  }
+  return false;
+}
+
+function getCourses(dayName, weekNum) {
+  return SCHEDULE.course_list.filter(c => c.d === dayName && inWeek(c.w, weekNum));
+}
+
+function formatCourses(courses) {
+  if (!courses.length) return "今天没有课";
+  return courses.sort((a,b)=>a.s.localeCompare(b.s)).map(c => `${c.s}-${c.e}  ${c.n} @ ${c.l}`).join("\n");
+}
+
+function getAllCourseNames() {
+  return [...new Set(SCHEDULE.course_list.map(c => c.n))];
+}
+
+function getWeekTasks(weekNum) {
+  return SCHEDULE.course_list.filter(c => c.n.includes("实验") && inWeek(c.w, weekNum)).map(c => `${c.n}（${c.d} ${c.s}，${c.l}）`);
+}
+
+// ── DeepSeek API ──
+const API_KEY = "sk-3bda8aa6238d4e4a8d2c2d962efec207";
+const API_URL = "https://api.deepseek.com/v1/chat/completions";
+
+const TOOLS = [
+  {type:"function",function:{name:"get_today",description:"获取今天的课程",parameters:{type:"object",properties:{}}}},
+  {type:"function",function:{name:"get_day",description:"获取指定星期几的课程",parameters:{type:"object",properties:{day:{type:"string",description:"如星期一"}},required:["day"]}}},
+  {type:"function",function:{name:"get_week_courses",description:"获取本周全部课程",parameters:{type:"object",properties:{}}}},
+  {type:"function",function:{name:"get_tasks",description:"获取本周实验任务",parameters:{type:"object",properties:{}}}},
+  {type:"function",function:{name:"get_courses",description:"获取本学期所有课程名称",parameters:{type:"object",properties:{}}}},
+];
+
+async function callDeepSeek(messages) {
+  const r = await fetch(API_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+    model:"deepseek-chat",messages,tools:TOOLS,tool_choice:"auto",temperature:0.1,max_tokens:1024
+  })});
+  return r.json();
+}
+
+function executeTool(name, args) {
+  const week = getCurrentWeek();
+  const now = new Date();
+  switch(name) {
+    case "get_today": {
+      const dn = getDayName(now);
+      const c = getCourses(dn, week);
+      return {day:dn,courses:formatCourses(c),count:c.length};
+    }
+    case "get_day": {
+      const c = SCHEDULE.course_list.filter(x => x.d === args.day);
+      return {day:args.day,courses:formatCourses(c),count:c.length};
+    }
+    case "get_week_courses": {
+      let lines = [];
+      for (const dn of ["星期一","星期二","星期三","星期四","星期五","星期六","星期日"]) {
+        const c = getCourses(dn, week);
+        if (c.length) {
+          lines.push("-- "+dn+" --");
+          lines.push(formatCourses(c));
+        }
+      }
+      return {courses:lines.join("\n")||"本周没有课"};
+    }
+    case "get_tasks": {
+      return {tasks:getWeekTasks(week)};
+    }
+    case "get_courses": {
+      return {courses:getAllCourseNames(),count:getAllCourseNames().length};
+    }
+  }
+}
+
+async function agent(userMsg) {
+  const msgs = [{role:"system",content:"你是课表助手。回答简洁直接，列出课程时间和地点。如果没课就说没课。"},{role:"user",content:userMsg}];
+  for (let i=0; i<5; i++) {
+    const result = await callDeepSeek(msgs);
+    if (result.error) return "API错误: "+result.error.message;
+    if (!result.choices) return "API返回异常";
+    const msg = result.choices[0].message;
+    if (msg.tool_calls) {
+      msgs.push(msg);
+      for (const tc of msg.tool_calls) {
+        const args = JSON.parse(tc.function.arguments||"{}");
+        const output = executeTool(tc.function.name, args);
+        msgs.push({role:"tool",tool_call_id:tc.id,content:JSON.stringify(output)});
+      }
+    } else {
+      return msg.content||"";
+    }
+  }
+  return "暂时无法回答";
+}
+
+// ── UI ──
+function addMsg(text, role) {
+  const d = document.getElementById("chat");
+  const m = document.createElement("div");
+  m.className = "msg "+role;
+  m.textContent = text;
+  d.appendChild(m);
+  d.scrollTop = d.scrollHeight;
+}
+
+async function send() {
+  const inp = document.getElementById("input");
+  const btn = document.getElementById("send");
+  const loading = document.getElementById("loading");
+  const text = inp.value.trim();
+  if (!text) return;
+  addMsg(text, "user");
+  inp.value = "";
+  btn.disabled = true;
+  loading.style.display = "block";
+  try {
+    const reply = await agent(text);
+    addMsg(reply, "bot");
+  } catch(e) {
+    addMsg("出错了: "+e.message, "bot");
+  }
+  btn.disabled = false;
+  loading.style.display = "none";
+}
+
+document.getElementById("input").addEventListener("keydown", e => { if(e.key==="Enter") send(); });
+addMsg("你好！我是课表助手，试试问：\n今天有什么课？\n这周有什么实验？\n星期五的课？\n（注意：需要联网才能使用）", "bot");
+</script>
+</body>
+</html>
