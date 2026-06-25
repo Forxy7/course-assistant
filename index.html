@@ -131,7 +131,12 @@ async function callDeepSeek(messages) {
   const r = await fetch(API_URL, {method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+API_KEY},body:JSON.stringify({
     model:"deepseek-chat",messages,tools:TOOLS,tool_choice:"auto",temperature:0.1,max_tokens:1024
   })});
-  return r.json();
+  try {
+    return await r.json();
+  } catch(e) {
+    const text = await r.text();
+    throw new Error("HTTP "+r.status+": "+text.slice(0,200));
+  }
 }
 
 function executeTool(name, args) {
